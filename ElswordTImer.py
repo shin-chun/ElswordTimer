@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, filedialog
+import os
 import threading
 import time
 import keyboard
@@ -8,6 +8,8 @@ import platform
 import winsound
 from hotkey_listener import HotkeyListener
 from collections import deque
+from tkinter import messagebox, filedialog
+
 
 
 ### 主視窗架構 ###
@@ -262,23 +264,24 @@ class CountdownWindow:
         self.win = tk.Toplevel()
         self.win.overrideredirect(True)  # 無邊框
         self.win.geometry("300x50")
+        self.load_position()
         self.win.attributes("-topmost", True)
 
         self.win.config(bg="yellow")
+        self.win.wm_attributes("-transparentcolor", "yellow")
 
         self.label = tk.Label(
             self.win,
             text=f"{name}:{duration}秒",
             font=("Segoe UI", 16, "bold"),
             fg="black",
-            bg="yellow"
+            bg="white"
         )
         self.label.pack(expand=True, padx=10, pady=10)
 
         # 拖曳移動
-        self.win.bind("<ButtonPress-1>", self.start_move)
-        self.win.bind("<B1-Motion>", self.do_move)
-
+        self.label.bind("<ButtonPress-1>", self.start_move)
+        self.label.bind("<B1-Motion>", self.do_move)
         # 右鍵選單
         self.menu = tk.Menu(self.win, tearoff=0)
         self.menu.add_command(label="關閉視窗", command=self.stop)
@@ -291,7 +294,7 @@ class CountdownWindow:
             return
         self.remaining = self.duration
         self.running = True
-        self.win.config(bg="#123456")
+        self.win.config(bg="yellow")
         self.label.config(bg="#123456")
         self.update_countdown()
 
@@ -301,7 +304,7 @@ class CountdownWindow:
         if self.remaining <= 0:
             self.label.config(text=f"{self.name} ✅ 完成")
             self.play_sound()
-            self.win.config(bg="lightgreen")
+            self.win.config(bg="yellow")
             self.label.config(bg="lightgreen")
             self.running = False
             return
@@ -315,7 +318,7 @@ class CountdownWindow:
         self.running = False
         self.remaining = self.duration
         self.win.config(bg="yellow")
-        self.label.config(bg="yellow")
+        self.label.config(bg="white")
         self.label.config(text=f"{self.name} 等待觸發")
 
     def play_sound(self):
@@ -328,24 +331,65 @@ class CountdownWindow:
             print(f"提示音錯誤：{e}")
 
     def stop(self):
+        self.save_position()
+        self.win.destroy()
         self.running = False
         if self.win.winfo_exists():
             self.win.destroy()
 
     def start_move(self, event):
-        self._x = event.x
-        self._y = event.y
+        self._x = event.x_root
+        self._y = event.y_root
 
     def do_move(self, event):
-        x = event.x_root - self._x
-        y = event.y_root - self._y
+        dx = event.x_root - self._x
+        dy = event.y_root - self._y
+
+        geom = self.win.geometry()
+        geom_parts = geom.split('+')
+        x = int(geom_parts[1]) + dx
+        y = int(geom_parts[2]) + dy
+
         self.win.geometry(f"+{x}+{y}")
+        self._x = event.x_root
+        self._y = event.y_root
+
 
     def show_context_menu(self, event):
         try:
             self.menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.menu.grab_release()
+
+    def save_position(self):
+        try:
+            if os.path.exists("window_positions.json"):
+                with open("window_positions.json", "r") as f:
+                    all_positions = json.load(f)
+            else:
+                all_positions = {}
+
+            geom = self.win.geometry().split('+')
+            x = int(geom[1])
+            y = int(geom[2])
+            all_positions[self.name] = {'x': x, 'y': y}
+
+            with open("window_positions.json", "w") as f:
+                json.dump(all_positions, f)
+        except Exception as e:
+            print(f"儲存位置失敗：{e}")
+
+    def load_position(self):
+        try:
+            if os.path.exists("window_positions.json"):
+                with open("window_positions.json", "r") as f:
+                    all_positions = json.load(f)
+
+                if self.name in all_positions:
+                    pos = all_positions[self.name]
+                    self.win.geometry(f"300x50+{pos['x']}+{pos['y']}")
+        except Exception as e:
+            print(f"載入位置失敗：{e}")
 
 ## 程式運行邏輯 ##
 class Timer:
