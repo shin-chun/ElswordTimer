@@ -424,11 +424,11 @@ class Timer:
 
         # 如果目前不是在 index 0，但按到了第一個鍵，重新開始
         if self.index_keys != 0 and key == self.keys[0]:
-            self.index_keys = 0
+            self.index_keys = 1
             self.last_time = time.time()
             return
         elif self.index_keys1 != 0 and key == self.keys1[0]:
-            self.index_keys1 = 0
+            self.index_keys1 = 1
             self.last_time = time.time()
             return
 
