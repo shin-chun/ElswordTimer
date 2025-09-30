@@ -425,6 +425,9 @@ class Timer:
             self.index = 1
             self.last_time = time.time()
             return
+        elif self.index != 0 and key == self.keys1[0]:
+            self.index = 1
+            self.last_time = time.time()
 
         # 正常比對流程
         if self.index < len(self.keys):
@@ -436,6 +439,17 @@ class Timer:
                 if self.index == len(self.keys):
                     self.start_countdown()
                     self.index = 0
+
+        if self.index < len(self.keys1):
+            expected = self.keys1[self.index]
+            if key == expected:
+                self.index += 1
+                self.last_time = time.time()
+
+                if self.index == len(self.keys1):
+                    self.start_countdown()
+                    self.index = 0
+
 
     def trigger(self):
         self.index = 0
