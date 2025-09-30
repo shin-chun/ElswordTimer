@@ -53,7 +53,6 @@ class TimerApp:
 
         threading.Thread(target=self.listen_keys, daemon=True).start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.root.bind("<F8>", self.handle_reset_shortcut)
         self.root.mainloop()
 
     def handle_reset_shortcut(self, event=None):
@@ -82,18 +81,23 @@ class TimerApp:
     def open_add_window(self):
         add_win = tk.Toplevel(self.root)
         add_win.title("新增計時器")
-        add_win.geometry("300x400")
+        add_win.geometry("300x350")
 
         tk.Label(add_win, text="計時器名稱").pack()
         name_entry = tk.Entry(add_win)
         name_entry.pack()
 
-        tk.Label(add_win, text="多組按鍵序列（每組用逗號，組與組用分號）").pack()
-        seq_entry = tk.Entry(add_win)
-        seq_entry.insert(0, "a,b,c;x,y,z")
-        seq_entry.pack()
+        tk.Label(add_win, text="按鍵組合（用逗號分隔）").pack()
+        keys_entry = tk.Entry(add_win)
+        keys_entry.insert(0, "a,b,c")
+        keys_entry.pack()
 
-        tk.Label(add_win, text="秒數內完成每組").pack()
+        tk.Label(add_win, text="第二組按鍵組合").pack()
+        keys1_entry = tk.Entry(add_win)
+        keys1_entry.insert(0, "a,b,c")
+        keys1_entry.pack()
+
+        tk.Label(add_win, text="秒數內完成組合").pack()
         window_entry = tk.Entry(add_win)
         window_entry.insert(0, "3")
         window_entry.pack()
@@ -103,16 +107,22 @@ class TimerApp:
         duration_entry.insert(0, "7")
         duration_entry.pack()
 
+        # strict_var = tk.BooleanVar()
+        # tk.Checkbutton(add_win, text="嚴格匹配模式", variable=strict_var).pack()
+
         def confirm_add():
             try:
                 name = name_entry.get().strip()
-                sequences = [[k.strip() for k in group.split(",")] for group in seq_entry.get().split(";")]
+                keys = [k.strip() for k in keys_entry.get().split(",")]
+                keys1 = [k.strip() for k in keys1_entry.get().split(",")]
                 window = float(window_entry.get())
                 duration = int(duration_entry.get())
-
-                timer = AdvancedTimer(name, sequences, window, duration)
+                # strict = strict_var.get()
+                timer = Timer(name, keys, keys1, window, duration)
                 self.timers.append(timer)
-                self.timer_listbox.insert(tk.END, f"{name}：{sequences}（{window}s）→ 倒數 {duration}s")
+                self.timer_listbox.insert(tk.END,
+                                          f"{name}：{keys} or {keys1}（{window}s）→ 倒數 {duration}s ")
+
                 add_win.destroy()
             except Exception as e:
                 messagebox.showerror("錯誤", f"新增失敗：{e}")
@@ -129,19 +139,24 @@ class TimerApp:
 
         edit_win = tk.Toplevel(self.root)
         edit_win.title("編輯計時器")
-        edit_win.geometry("300x400")
+        edit_win.geometry("300x350")
 
         tk.Label(edit_win, text="計時器名稱").pack()
         name_entry = tk.Entry(edit_win)
         name_entry.insert(0, timer.name)
         name_entry.pack()
 
-        tk.Label(edit_win, text="多組按鍵序列（每組用逗號，組與組用分號）").pack()
-        seq_entry = tk.Entry(edit_win)
-        seq_entry.insert(0, ";".join([",".join(seq) for seq in timer.sequences]))
-        seq_entry.pack()
+        tk.Label(edit_win, text="按鍵組合（用逗號分隔）").pack()
+        keys_entry = tk.Entry(edit_win)
+        keys_entry.insert(0, ",".join(timer.keys))
+        keys_entry.pack()
 
-        tk.Label(edit_win, text="秒數內完成每組").pack()
+        tk.Label(edit_win, text="第二組按鍵組合（用逗號分隔）").pack()
+        keys1_entry = tk.Entry(edit_win)
+        keys1_entry.insert(0, ",".join(timer.keys1))
+        keys1_entry.pack()
+
+        tk.Label(edit_win, text="秒數內完成組合").pack()
         window_entry = tk.Entry(edit_win)
         window_entry.insert(0, str(timer.window))
         window_entry.pack()
@@ -151,21 +166,26 @@ class TimerApp:
         duration_entry.insert(0, str(timer.duration))
         duration_entry.pack()
 
+        strict_var = tk.BooleanVar(value=timer.strict)
+        tk.Checkbutton(edit_win, text="嚴格匹配模式", variable=strict_var).pack()
+
         def confirm_edit():
             try:
                 timer.name = name_entry.get().strip()
-                timer.sequences = [[k.strip() for k in group.split(",")] for group in seq_entry.get().split(";")]
+                timer.keys = [k.strip() for k in keys_entry.get().split(",")]
+                timer.keys1 = [k.strip() for k in keys1_entry.get().split(",")]
                 timer.window = float(window_entry.get())
                 timer.duration = int(duration_entry.get())
+                timer.strict = strict_var.get()
 
                 self.timer_listbox.delete(index)
-                self.timer_listbox.insert(index,
-                                          f"{timer.name}：{timer.sequences}（{timer.window}s）→ 倒數 {timer.duration}s")
+                self.timer_listbox.insert(index, f"{timer.name}：{timer.keys} or {timer.keys1}（{timer.window}s）→ 倒數 {timer.duration}s {'[嚴格]' if timer.strict else ''}")
                 edit_win.destroy()
             except Exception as e:
                 messagebox.showerror("錯誤", f"編輯失敗：{e}")
 
         tk.Button(edit_win, text="確認修改", command=confirm_edit).pack(pady=10)
+
     def delete_timer(self):
         selected = self.timer_listbox.curselection()
         if not selected:
@@ -180,8 +200,7 @@ class TimerApp:
     def reset_all_timers(self):
         for timer in self.timers:
             timer.active = True
-            timer.reset_sequence()  # ✅ 只重置階段，不觸發倒數
-            timer.last_trigger_time = None  # ✅ 清除冷卻時間
+            timer.trigger()
 
     def save_config(self):
         path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON 檔案", "*.json")])
@@ -207,20 +226,13 @@ class TimerApp:
             self.timers.clear()
             self.timer_listbox.delete(0, tk.END)
             for item in data:
-                timer = AdvancedTimer(
-                    item["name"],
-                    item["sequences"],
-                    item["window"],
-                    item["duration"]
-                )
+                timer = Timer(item["name"], item["keys"],item["keys1"], item["window"], item["duration"], item.get("strict", False))
                 self.timers.append(timer)
-                self.timer_listbox.insert(
-                    tk.END,
-                    f"{timer.name}：{timer.sequences}（{timer.window}s）→ 倒數 {timer.duration}s"
-                )
+                self.timer_listbox.insert(tk.END, f"{timer.name}：{timer.keys} or {timer.keys1}（{timer.window}s）→ 倒數 {timer.duration}s {'[嚴格]' if timer.strict else ''}")
             messagebox.showinfo("成功", "設定已匯入")
         except Exception as e:
             messagebox.showerror("錯誤", f"匯入失敗：{e}")
+
     def listen_keys(self):
         while True:
             if not self.master_switch.get():
@@ -277,8 +289,8 @@ class CountdownWindow:
 
         self.win.protocol("WM_DELETE_WINDOW", self.stop)
 
-    def restart(self, force=False):
-        if self.running and not force:
+    def restart(self):
+        if self.running:
             return
         self.remaining = self.duration
         self.running = True
@@ -380,84 +392,79 @@ class CountdownWindow:
             print(f"載入位置失敗：{e}")
 
 ## 程式運行邏輯 ##
-class AdvancedTimer:
-    def __init__(self, name, sequences, window, duration):
+class Timer:
+    def __init__(self, name, keys, keys1, window, duration, strict=True):
         self.name = name
-        self.sequences = sequences  # 多組鍵序列，例如 [['a','b','c'], ['x','y','z']]
-        self.window = window        # 每階段最大容忍時間（秒）
-        self.duration = duration    # 倒數視窗時間
+        self.keys = keys  # 例如 ['shift', 'up', '1']
+        self.keys1 = keys1
+        self.window = window  # 時間窗格（秒）
+        self.duration = duration
+        self.strict = strict  # 保留欄位，但此版本強制順序比對
         self.active = True
-        self.stage = 0
+        self.index = 0  # 目前比對到第幾個鍵
+        # self.key_buffer = deque(maxlen=len(keys))  # 滑動視窗
         self.last_time = None
-        self.last_trigger_time = None
-        self.current_sequence = None
         self.countdown_window = CountdownWindow(name, duration)
-
-    def check_key(self, key):
-        if not self.active:
-            return
-        now = time.time()
-
-        # 冷卻中 → 不觸發
-        if self.last_trigger_time and now - self.last_trigger_time < self.duration:
-            return
-
-        # 尚未啟動任何序列 → 嘗試啟動
-        if self.current_sequence is None:
-            for seq in self.sequences:
-                if key == seq[0]:
-                    self.current_sequence = seq
-                    self.stage = 1
-                    self.last_time = now
-                    return
-            return
-
-        # 超時 → 重置
-        if now - self.last_time > self.window:
-            self.reset_sequence()
-            return
-
-        expected_key = self.current_sequence[self.stage]
-        if key == expected_key:
-            self.stage += 1
-            self.last_time = now
-            if self.stage == len(self.current_sequence):
-                self.trigger()
-                # self.reset_sequence()
-        else:
-            # 容錯：錯誤鍵不重置，只要時間內補正即可
-            pass
-
-    def trigger(self):
-        self.last_trigger_time = time.time()
-        if not self.countdown_window or not self.countdown_window.win.winfo_exists():
-            self.countdown_window = CountdownWindow(self.name, self.duration)
-        self.countdown_window.restart(force=True)
-
-    def reset_sequence(self):
-        self.stage = 0
-        self.last_time = None
-        self.current_sequence = None
-
-        if self.countdown_window:
-            self.countdown_window.show_only()  # ✅ 顯示視窗但不倒數
-
-    def reset(self):
-        self.active = False
-        self.reset_sequence()
-        self.close_window()
 
     def close_window(self):
         if self.countdown_window:
             self.countdown_window.stop()
             self.countdown_window = None
 
+    def check_key(self, key):
+        if not self.active:
+            return
+
+        # 超時就重設 index
+        if self.last_time and time.time() - self.last_time > self.window:
+            self.index = 0
+            self.last_time = None  # 可選，避免誤判
+
+        # 如果目前不是在 index 0，但按到了第一個鍵，重新開始
+        if self.index != 0 and key == self.keys[0]:
+            self.index = 1
+            self.last_time = time.time()
+            return
+
+        # 正常比對流程
+        if self.index < len(self.keys):
+            expected = self.keys[self.index]
+            if key == expected:
+                self.index += 1
+                self.last_time = time.time()
+
+                if self.index == len(self.keys):
+                    self.start_countdown()
+                    self.index = 0
+
+    def trigger(self):
+        self.index = 0
+        self.last_time = None
+        # 如果視窗不存在或已被關閉，就建立新視窗
+        if not self.countdown_window or not self.countdown_window.win.winfo_exists():
+            self.countdown_window = CountdownWindow(self.name, self.duration)
+
+        self.countdown_window.show_only()
+
+    def start_countdown(self):
+        if self.countdown_window:
+            self.countdown_window.restart()
+
+    def reset(self):
+        self.index = 0
+        self.last_time = None
+        self.active = False  # 停用此計時器toggle_master_switch
+        self.close_window()  # 關閉倒數視窗
+
     def to_dict(self):
         return {
             "name": self.name,
-            "sequences": self.sequences,
+            "keys": self.keys,
+            "keys1": self.keys1,
             "window": self.window,
             "duration": self.duration,
+            "strict": self.strict
         }
+
 if __name__ == "__main__":
     TimerApp()

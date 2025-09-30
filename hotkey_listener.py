@@ -16,3 +16,36 @@ class HotkeyListener:
         listener = keyboard.Listener(on_press=on_press)
         listener.daemon = True
         listener.start()
+
+
+
+class HotkeyController:
+    def __init__(self, manager):
+        self.manager = manager
+        self.stage = 0
+        self.selected = None
+
+    def on_press(self, key):
+        try:
+            k = key.char.lower()
+        except AttributeError:
+            k = str(key).lower()
+
+        if self.stage == 0:
+            if k in self.manager.timers:
+                self.selected = k
+                self.stage = 1
+                print(f"選擇：{k}")
+        elif self.stage == 1:
+            if k == 'shift':  # 第二鍵：鎖定
+                self.stage = 2
+                print(f"鎖定：{self.selected}")
+        elif self.stage == 2:
+            if k == 'enter':  # 第三鍵：觸發
+                print(f"觸發：{self.selected}")
+                self.manager.timers[self.selected].start()
+                self.stage = 0  # 重置流程
+
+    def start(self):
+        listener = keyboard.Listener(on_press=self.on_press)
+        listener.start()
