@@ -401,7 +401,8 @@ class Timer:
         self.duration = duration
         self.strict = strict  # 保留欄位，但此版本強制順序比對
         self.active = True
-        self.index = 0  # 目前比對到第幾個鍵
+        self.index_keys = 0  # 目前比對到第幾個鍵
+        self.index_keys1 = 0
         # self.key_buffer = deque(maxlen=len(keys))  # 滑動視窗
         self.last_time = None
         self.countdown_window = CountdownWindow(name, duration)
@@ -417,38 +418,40 @@ class Timer:
 
         # 超時就重設 index
         if self.last_time and time.time() - self.last_time > self.window:
-            self.index = 0
+            self.index_keys = 0
+            self.index_keys1 = 0
             self.last_time = None  # 可選，避免誤判
 
         # 如果目前不是在 index 0，但按到了第一個鍵，重新開始
-        if self.index != 0 and key == self.keys[0]:
-            self.index = 1
+        if self.index_keys != 0 and key == self.keys[0]:
+            self.index_keys = 0
             self.last_time = time.time()
             return
-        elif self.index != 0 and key == self.keys1[0]:
-            self.index = 1
+        elif self.index_keys1 != 0 and key == self.keys1[0]:
+            self.index_keys1 = 0
             self.last_time = time.time()
+            return
 
         # 正常比對流程
-        if self.index < len(self.keys):
-            expected = self.keys[self.index]
+        if self.index_keys < len(self.keys):
+            expected = self.keys[self.index_keys]
             if key == expected:
-                self.index += 1
+                self.index_keys += 1
                 self.last_time = time.time()
 
-                if self.index == len(self.keys):
+                if self.index_keys == len(self.keys):
                     self.start_countdown()
-                    self.index = 0
+                    self.index_keys = 0
 
-        if self.index < len(self.keys1):
-            expected = self.keys1[self.index]
+        if self.index_keys1 < len(self.keys1):
+            expected = self.keys1[self.index_keys1]
             if key == expected:
-                self.index += 1
+                self.index_keys1 += 1
                 self.last_time = time.time()
 
-                if self.index == len(self.keys1):
+                if self.index_keys1 == len(self.keys1):
                     self.start_countdown()
-                    self.index = 0
+                    self.index_keys1 = 0
 
 
     def trigger(self):
